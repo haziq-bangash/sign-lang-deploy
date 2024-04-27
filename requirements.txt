@@ -1,3 +1,4 @@
+opencv-python
 numpy
 Flask
 pose-format
@@ -6,4 +7,3 @@ python-dotenv
 cloudinary
 requests
 gunicorn
-opencv-python
