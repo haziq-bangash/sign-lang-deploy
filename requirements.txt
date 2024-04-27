@@ -4,3 +4,4 @@ pose-format
 imageio
 python-dotenv
 cloudinary
+requests
