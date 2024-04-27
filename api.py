@@ -61,4 +61,4 @@ def get_pose_gif():
     return jsonify({'gif_url': gif_url})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
