@@ -3,3 +3,4 @@ Flask
 pose-format
 imageio
 python-dotenv
+cloudinary
