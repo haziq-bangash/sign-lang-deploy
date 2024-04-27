@@ -6,18 +6,24 @@ import imageio
 import numpy as np
 from dotenv import load_dotenv
 import os
+import cloudinary
+import cloudinary.uploader
 
 # Load environment variables
 load_dotenv()
 app = Flask(__name__)
 
 # Access environment variables
-VERCEL_TOKEN = os.getenv('VERCEL_TOKEN')
-PROJECT_ID = os.getenv('PROJECT_ID')
-TEAM_ID = os.getenv('TEAM_ID')
+CLOUD_NAME = os.getenv('CLOUD_NAME')
+API_KEY = os.getenv('API_KEY')
+API_SECRET = os.getenv('API_SECRET')
 
-app = Flask(__name__)
-
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=CLOUD_NAME,
+    api_key=API_KEY,
+    api_secret=API_SECRET
+)
 
 def fetch_pose_from_api(text):
     url = "https://us-central1-sign-mt.cloudfunctions.net/spoken_text_to_signed_pose"
@@ -30,29 +36,29 @@ def fetch_pose_from_api(text):
 
 @app.route('/get_pose_gif', methods=['GET'])
 def get_pose_gif():
-    text = request.args.get('text', 'hello')
+    if not request.is_json:
+        return jsonify({"error": "Missing JSON in request"}), 400
+    data = request.get_json()
+    text = data.get('text', 'hello') 
     pose_data = fetch_pose_from_api(text)
     pose = Pose.read(pose_data)
     v = PoseVisualizer(pose)
     gif_frames = [frame.astype(np.uint8) for frame in v.draw()]
 
-    gif_path = "pose_animation.gif"
+    gif_path = f"{text}.gif"
     imageio.mimsave(gif_path, gif_frames, format='GIF', fps=10)
 
-    blob_url = upload_to_vercel_blob(gif_path)
-    return jsonify({'gif_url': blob_url})
-
-def upload_to_vercel_blob(file_path):
-    url = f"https://api.vercel.com/v8/projects/{PROJECT_ID}/blobs"
-    headers = {'Authorization': f'Bearer {VERCEL_TOKEN}'}
-    files = {'file': open(file_path, 'rb')}
-    response = requests.post(url, headers=headers, files=files)
-
-    if response.status_code == 200:
-        blob_id = response.json()['id']
-        return f"https://api.vercel.com/v8/projects/{PROJECT_ID}/blobs/{blob_id}"
-    else:
-        raise Exception(f"Failed to upload blob: {response.status_code}, {response.text}")
+    # Upload to Cloudinary
+    upload_response = cloudinary.uploader.upload(
+        gif_path,
+        resource_type='image',
+        format='gif'
+    )
+    os.remove(gif_path)
+    
+    # Obtain the URL of the uploaded GIF
+    gif_url = upload_response.get('url')
+    return jsonify({'gif_url': gif_url})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
