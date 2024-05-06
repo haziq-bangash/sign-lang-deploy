@@ -2,7 +2,7 @@ import requests
 from flask import Flask, request, jsonify
 from pose_format import Pose
 from pose_format.pose_visualizer import PoseVisualizer
-import imageio
+from PIL import Image
 import numpy as np
 from dotenv import load_dotenv
 import os
@@ -34,31 +34,46 @@ def fetch_pose_from_api(text):
     else:
         raise Exception(f"Failed to fetch pose data: Status code {response.status_code}, {response.text}")
 
+def frames_to_gif(frames, gif_path, fps=30):
+    pil_images = [Image.fromarray(frame.astype(np.uint8)) for frame in frames]
+    pil_images[0].save(
+        gif_path,
+        save_all=True,
+        append_images=pil_images[1:],
+        format='GIF',
+        loop=0,
+        duration=int(1000/fps)
+    )
+
 @app.route('/get_pose_gif', methods=['GET'])
 def get_pose_gif():
     if not request.is_json:
         return jsonify({"error": "Missing JSON in request"}), 400
     data = request.get_json()
     text = data.get('text', 'hello') 
-    pose_data = fetch_pose_from_api(text)
-    pose = Pose.read(pose_data)
-    v = PoseVisualizer(pose)
-    gif_frames = [frame.astype(np.uint8) for frame in v.draw()]
-
-    gif_path = f"{text}.gif"
-    imageio.mimsave(gif_path, gif_frames, format='GIF', fps=10)
-
-    # Upload to Cloudinary
-    upload_response = cloudinary.uploader.upload(
-        gif_path,
-        resource_type='image',
-        format='gif'
-    )
-    os.remove(gif_path)
+    print(text)
+    print(type(text))
     
-    # Obtain the URL of the uploaded GIF
-    gif_url = upload_response.get('url')
-    return jsonify({'gif_url': gif_url})
+    if "call" in text:
+        pose_data = fetch_pose_from_api(text)
+        pose = Pose.read(pose_data)
+        v = PoseVisualizer(pose)
+        gif_frames = [frame.astype(np.uint8) for frame in v.draw()]
+
+        gif_path = f"{text}.gif"
+        frames_to_gif(gif_frames, gif_path, fps=30)
+        
+        upload_response = cloudinary.uploader.upload(
+            gif_path,
+            resource_type='image',
+            format='gif'
+        )
+        os.remove(gif_path)
+        
+        gif_url = upload_response.get('url')
+        return jsonify({'gif_url': gif_url})
+    else:
+        return jsonify({"error": "Invalid request"}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
