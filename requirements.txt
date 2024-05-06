@@ -8,4 +8,3 @@ cloudinary
 requests
 gunicorn
 Pillow
-opencv-python
